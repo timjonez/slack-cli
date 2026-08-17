@@ -29,6 +29,12 @@ type fakeClient struct {
 	listenErr  error
 	lastText   string
 	lastThread string
+	get        slackx.Event
+	getErr     error
+	thread     []slackx.Event
+	threadErr  error
+	lastGetCh  string
+	lastGetTS  string
 }
 
 func (f *fakeClient) AuthTest(ctx context.Context) (slackx.Auth, error) {
@@ -49,6 +55,36 @@ func (f *fakeClient) PostMessage(ctx context.Context, channelID, text, threadTS 
 		p.Text = text
 	}
 	return p, nil
+}
+func (f *fakeClient) GetMessage(ctx context.Context, channelID, ts string) (slackx.Event, error) {
+	f.lastGetCh = channelID
+	f.lastGetTS = ts
+	if f.getErr != nil {
+		return slackx.Event{}, f.getErr
+	}
+	ev := f.get
+	if ev.TS == "" {
+		ev.TS = ts
+	}
+	if ev.Channel == "" {
+		ev.Channel = channelID
+	}
+	return ev, nil
+}
+func (f *fakeClient) GetThread(ctx context.Context, channelID, ts string) ([]slackx.Event, error) {
+	f.lastGetCh = channelID
+	f.lastGetTS = ts
+	if f.threadErr != nil {
+		return nil, f.threadErr
+	}
+	if f.thread != nil {
+		return f.thread, nil
+	}
+	ev, err := f.GetMessage(ctx, channelID, ts)
+	if err != nil {
+		return nil, err
+	}
+	return []slackx.Event{ev}, nil
 }
 func (f *fakeClient) Join(ctx context.Context, channelID string) error {
 	f.joined = channelID
@@ -184,6 +220,84 @@ func TestSendJSON(t *testing.T) {
 	}
 	if m["ts"] != "4.0" || m["channel"] != "C1" {
 		t.Fatalf("%v", m)
+	}
+}
+
+func TestGetJSON(t *testing.T) {
+	f := &fakeClient{
+		get: slackx.Event{
+			Type: "message", Channel: "C1", ChannelName: "#eng",
+			User: "U1", UserName: "alice", TS: "1.0", Text: "parent text",
+		},
+		resolve: map[string]slackx.Channel{"#eng": {ID: "C1", Name: "eng", IsMember: true}},
+	}
+	a, out, errb := testApp(f)
+	if code := a.Execute([]string{"--json", "get", "#eng", "1.0"}); code != 0 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	if f.lastGetCh != "C1" || f.lastGetTS != "1.0" {
+		t.Fatalf("ch=%q ts=%q", f.lastGetCh, f.lastGetTS)
+	}
+	var ev slackx.Event
+	if err := json.Unmarshal(out.Bytes(), &ev); err != nil {
+		t.Fatal(err)
+	}
+	if ev.Text != "parent text" || ev.TS != "1.0" {
+		t.Fatalf("%+v", ev)
+	}
+}
+
+func TestGetHuman(t *testing.T) {
+	f := &fakeClient{
+		get: slackx.Event{
+			Channel: "C1", ChannelName: "#eng",
+			User: "U1", UserName: "alice", TS: "1710000000.000100", Text: "parent text",
+		},
+		resolve: map[string]slackx.Channel{"#eng": {ID: "C1", Name: "eng", IsMember: true}},
+	}
+	a, out, errb := testApp(f)
+	if code := a.Execute([]string{"get", "#eng", "1710000000.000100"}); code != 0 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	got := out.String()
+	if !strings.Contains(got, "#eng") || !strings.Contains(got, "@alice") || !strings.Contains(got, "parent text") {
+		t.Fatalf("%q", got)
+	}
+}
+
+func TestGetRepliesJSON(t *testing.T) {
+	f := &fakeClient{
+		thread: []slackx.Event{
+			{Type: "message", Channel: "C1", TS: "1.0", Text: "parent"},
+			{Type: "message", Channel: "C1", TS: "2.0", ThreadTS: "1.0", Text: "reply"},
+		},
+		resolve: map[string]slackx.Channel{"#eng": {ID: "C1", Name: "eng", IsMember: true}},
+	}
+	a, out, errb := testApp(f)
+	if code := a.Execute([]string{"--json", "get", "#eng", "1.0", "--replies"}); code != 0 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	var msgs []slackx.Event
+	if err := json.Unmarshal(out.Bytes(), &msgs); err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 2 || msgs[0].Text != "parent" || msgs[1].Text != "reply" {
+		t.Fatalf("%+v", msgs)
+	}
+}
+
+func TestGetNotFoundJSON(t *testing.T) {
+	f := &fakeClient{getErr: slackx.ErrNotFound}
+	a, _, errb := testApp(f)
+	if code := a.Execute([]string{"--json", "get", "#eng", "9.0"}); code != 1 {
+		t.Fatalf("exit %d", code)
+	}
+	var je jsonError
+	if err := json.Unmarshal(errb.Bytes(), &je); err != nil {
+		t.Fatal(err)
+	}
+	if je.Code != "not_found" {
+		t.Fatalf("%+v", je)
 	}
 }
 

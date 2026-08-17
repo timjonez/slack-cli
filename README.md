@@ -1,6 +1,6 @@
 # slackcli
 
-Post to Slack as a bot and listen for replies in a long-running terminal process.
+Post to Slack as a bot, listen for replies, and fetch messages by timestamp.
 
 This is not Slack’s official app-dev CLI (`slack`). The binary is `slackcli` so the two can coexist.
 
@@ -35,7 +35,7 @@ Tokens can also live in the environment. Resolution order (first non-empty wins 
 
 Override the file path with `SLACKCLI_CONFIG`. The file is written mode `0600`. Tokens are never printed.
 
-`send`, `whoami`, `channels`, and `join` need the bot token. `listen` needs both.
+`send`, `get`, `whoami`, `channels`, and `join` need the bot token. `listen` needs both.
 
 ## Commands
 
@@ -43,6 +43,9 @@ Override the file path with `SLACKCLI_CONFIG`. The file is written mode `0600`. 
 slackcli send #eng "deploy complete"
 slackcli send #eng --thread 1710000000.000100 "follow-up"
 echo "from pipe" | slackcli send #eng
+
+slackcli get #eng 1710000000.000100
+slackcli get #eng 1710000000.000100 --replies
 
 slackcli listen                 # every conversation the bot is in
 slackcli listen #eng

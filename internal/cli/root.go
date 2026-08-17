@@ -73,8 +73,8 @@ var errSilent = errors.New("silent")
 func (a *App) rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "slackcli",
-		Short:         "Send and listen as a Slack bot",
-		Long:          "slackcli posts messages as a Slack bot and listens for channel replies over Socket Mode.",
+		Short:         "Send, listen, and read as a Slack bot",
+		Long:          "slackcli posts messages as a Slack bot, listens for channel replies over Socket Mode, and fetches messages by timestamp.",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
@@ -85,6 +85,7 @@ func (a *App) rootCmd() *cobra.Command {
 	root.AddCommand(a.authCmd())
 	root.AddCommand(a.whoamiCmd())
 	root.AddCommand(a.sendCmd())
+	root.AddCommand(a.getCmd())
 	root.AddCommand(a.listenCmd())
 	root.AddCommand(a.channelsCmd())
 	root.AddCommand(a.joinCmd())
