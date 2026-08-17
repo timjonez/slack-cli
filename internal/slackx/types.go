@@ -15,6 +15,8 @@ var ErrNotFound = errors.New("not found")
 type Client interface {
 	AuthTest(ctx context.Context) (Auth, error)
 	PostMessage(ctx context.Context, channelID, text, threadTS string) (Posted, error)
+	GetMessage(ctx context.Context, channelID, ts string) (Event, error)
+	GetThread(ctx context.Context, channelID, ts string) ([]Event, error)
 	Join(ctx context.Context, channelID string) error
 	ResolveChannel(ctx context.Context, nameOrID string) (Channel, error)
 	ListJoined(ctx context.Context) ([]Channel, error)
