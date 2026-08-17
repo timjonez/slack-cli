@@ -1,0 +1,34 @@
+display_information:
+  name: slackcli
+  description: Terminal bot for sending and listening to Slack messages
+features:
+  bot_user:
+    display_name: slackcli
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - chat:write.public
+      - channels:history
+      - channels:read
+      - channels:join
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - im:write
+      - mpim:history
+      - mpim:read
+      - users:read
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim
+      - app_mention
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
