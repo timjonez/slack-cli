@@ -44,7 +44,8 @@ func (a *App) listenCmd() *cobra.Command {
 							return err
 						}
 						filter.Channels[ch.ID] = struct{}{}
-						if !ch.IsMember {
+						// IMs/MPIMs omit is_member; being able to resolve the DM means we are in it.
+						if !ch.IsMember && !ch.IsIM && !ch.IsMPIM {
 							fmt.Fprintf(a.Stderr, "warning: bot is not in %s; you will not receive messages until invited\n", ch.Display())
 						}
 					}

@@ -20,6 +20,7 @@ Requires Go 1.25+.
 2. Under **Basic Information → App-Level Tokens**, generate a token with the `connections:write` scope. It starts with `xapp-`.
 3. **Install App** to your workspace. Copy the **Bot User OAuth Token** (`xoxb-`).
 4. Invite the bot to any **private** channel you want it to see (`/invite @slackcli`). Public channels can be joined with `slackcli join #name`.
+5. If you already created the app before Messages was enabled: **App Home → Show Tabs → Messages** — turn the tab on and allow users to send messages (uncheck read-only). Without that, Slack shows “Sending messages to this app has been turned off.”
 
 ```bash
 slackcli auth set --bot-token xoxb-... --app-token xapp-...

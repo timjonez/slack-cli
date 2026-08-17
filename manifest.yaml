@@ -2,6 +2,10 @@ display_information:
   name: slackcli
   description: Terminal bot for sending and listening to Slack messages
 features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
   bot_user:
     display_name: slackcli
     always_online: true
@@ -21,6 +25,7 @@ oauth_config:
       - mpim:history
       - mpim:read
       - users:read
+      - app_mentions:read
 settings:
   event_subscriptions:
     bot_events:

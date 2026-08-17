@@ -226,6 +226,22 @@ func TestListenNotMemberWarns(t *testing.T) {
 	}
 }
 
+func TestListenDMSkipsMemberWarning(t *testing.T) {
+	f := &fakeClient{
+		auth: slackx.Auth{UserID: "UBOT"},
+		resolve: map[string]slackx.Channel{
+			"D0BQJRLC11U": {ID: "D0BQJRLC11U", IsIM: true, IsMember: false},
+		},
+	}
+	a, _, errb := testApp(f)
+	if code := a.Execute([]string{"listen", "D0BQJRLC11U"}); code != 0 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	if strings.Contains(errb.String(), "not in") {
+		t.Fatalf("should not warn for DMs: %q", errb.String())
+	}
+}
+
 func TestChannels(t *testing.T) {
 	f := &fakeClient{list: []slackx.Channel{
 		{ID: "C1", Name: "eng", IsMember: true},
