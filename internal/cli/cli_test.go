@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,25 +17,27 @@ import (
 )
 
 type fakeClient struct {
-	auth       slackx.Auth
-	authErr    error
-	posted     slackx.Posted
-	postErr    error
-	postCalls  int
-	joinErr    error
-	joined     string
-	resolve    map[string]slackx.Channel
-	list       []slackx.Channel
-	events     []slackx.Event
-	listenErr  error
-	lastText   string
-	lastThread string
-	get        slackx.Event
-	getErr     error
-	thread     []slackx.Event
-	threadErr  error
-	lastGetCh  string
-	lastGetTS  string
+	auth        slackx.Auth
+	authErr     error
+	posted      slackx.Posted
+	postErr     error
+	postCalls   int
+	joinErr     error
+	joined      string
+	resolve     map[string]slackx.Channel
+	list        []slackx.Channel
+	events      []slackx.Event
+	listenErr   error
+	lastText    string
+	lastThread  string
+	get         slackx.Event
+	getErr      error
+	thread      []slackx.Event
+	threadErr   error
+	lastGetCh   string
+	lastGetTS   string
+	lastFilter  slackx.Filter
+	listenCalls int
 }
 
 func (f *fakeClient) AuthTest(ctx context.Context) (slackx.Auth, error) {
@@ -110,6 +113,8 @@ func (f *fakeClient) ChannelName(ctx context.Context, channelID string) (string,
 	return "#" + channelID, nil
 }
 func (f *fakeClient) Listen(ctx context.Context, filter slackx.Filter, status func(string), emit func(slackx.Event) error) error {
+	f.listenCalls++
+	f.lastFilter = filter
 	if status != nil {
 		status("connected")
 	}
@@ -134,6 +139,10 @@ func testApp(f *fakeClient) (*App, *bytes.Buffer, *bytes.Buffer) {
 			return f, nil
 		},
 		stdinIsPipe: func() bool { return false },
+		ensureMux:   func(context.Context, string) error { return nil },
+		subscribe: func(ctx context.Context, socket string, filter slackx.Filter, status func(string), emit func(slackx.Event) error) error {
+			return f.Listen(ctx, filter, status, emit)
+		},
 	}
 	return a, out, errb
 }
@@ -324,6 +333,9 @@ func TestListenJSONL(t *testing.T) {
 	if !strings.Contains(errb.String(), "connected") {
 		t.Fatalf("status on stderr: %q", errb.String())
 	}
+	if _, ok := f.lastFilter.Channels["C1"]; !ok {
+		t.Fatalf("filter channels %+v", f.lastFilter.Channels)
+	}
 }
 
 func TestListenNotMemberWarns(t *testing.T) {
@@ -337,6 +349,68 @@ func TestListenNotMemberWarns(t *testing.T) {
 	}
 	if !strings.Contains(errb.String(), "not in #eng") {
 		t.Fatalf("stderr %q", errb.String())
+	}
+}
+
+func TestListenFilterFlags(t *testing.T) {
+	f := &fakeClient{
+		auth:    slackx.Auth{UserID: "UBOT", BotID: "BBOT"},
+		resolve: map[string]slackx.Channel{"#eng": {ID: "C1", Name: "eng", IsMember: true}},
+	}
+	a, _, errb := testApp(f)
+	if code := a.Execute([]string{"listen", "#eng", "--mentions", "--thread", "9.0"}); code != 0 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	if !f.lastFilter.Mentions || f.lastFilter.ThreadTS != "9.0" || f.lastFilter.BotUserID != "UBOT" {
+		t.Fatalf("%+v", f.lastFilter)
+	}
+}
+
+func TestListenSocketFlag(t *testing.T) {
+	f := &fakeClient{auth: slackx.Auth{UserID: "UBOT"}}
+	a, _, errb := testApp(f)
+	var got string
+	a.ensureMux = func(_ context.Context, socket string) error {
+		got = socket
+		return errors.New("stop")
+	}
+	if code := a.Execute([]string{"listen", "--socket", "/tmp/custom.sock"}); code != 1 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	if got != "/tmp/custom.sock" {
+		t.Fatalf("socket %q", got)
+	}
+	if f.listenCalls != 0 {
+		t.Fatalf("subscribe should not run, calls=%d", f.listenCalls)
+	}
+}
+
+func TestServeAlreadyRunningJSON(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "s.sock")
+	ln, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = c.Close()
+		}
+	}()
+	a, _, errb := testApp(&fakeClient{})
+	if code := a.Execute([]string{"--json", "serve", "--socket", socket}); code != 1 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	var je jsonError
+	if err := json.Unmarshal(errb.Bytes(), &je); err != nil {
+		t.Fatal(err)
+	}
+	if je.Code != "already_running" {
+		t.Fatalf("%+v", je)
 	}
 }
 
