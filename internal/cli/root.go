@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/timjonez/slack-cli/internal/config"
+	"github.com/timjonez/slack-cli/internal/mux"
 	"github.com/timjonez/slack-cli/internal/slackx"
 )
 
@@ -25,6 +27,9 @@ type App struct {
 	loadConfig  func() (config.Config, error)
 	newClient   func(cfg config.Config) (slackx.Client, error)
 	stdinIsPipe func() bool
+
+	ensureMux func(ctx context.Context, socket string) error
+	subscribe func(ctx context.Context, socket string, filter slackx.Filter, status func(string), emit func(slackx.Event) error) error
 }
 
 // NewApp constructs an App with process defaults.
@@ -44,6 +49,10 @@ func NewApp() *App {
 			}
 			return st.Mode()&os.ModeCharDevice == 0
 		},
+		ensureMux: func(ctx context.Context, socket string) error {
+			return mux.Ensure(ctx, socket, mux.StartDetached)
+		},
+		subscribe: mux.Subscribe,
 	}
 }
 
@@ -74,7 +83,7 @@ func (a *App) rootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "slackcli",
 		Short:         "Send, listen, and read as a Slack bot",
-		Long:          "slackcli posts messages as a Slack bot, listens for channel replies over Socket Mode, and fetches messages by timestamp.",
+		Long:          "slackcli posts messages as a Slack bot, listens for channel replies over a shared Socket Mode daemon, and fetches messages by timestamp.",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
@@ -87,6 +96,7 @@ func (a *App) rootCmd() *cobra.Command {
 	root.AddCommand(a.sendCmd())
 	root.AddCommand(a.getCmd())
 	root.AddCommand(a.listenCmd())
+	root.AddCommand(a.serveCmd())
 	root.AddCommand(a.channelsCmd())
 	root.AddCommand(a.joinCmd())
 	root.AddCommand(a.completionCmd(root))

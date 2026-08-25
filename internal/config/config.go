@@ -17,7 +17,7 @@ type Config struct {
 
 var (
 	ErrMissingBotToken = errors.New("bot token required (SLACK_BOT_TOKEN or slackcli auth set --bot-token)")
-	ErrMissingAppToken = errors.New("app token required for listen (SLACK_APP_TOKEN or slackcli auth set --app-token)")
+	ErrMissingAppToken = errors.New("app token required for listen/serve (SLACK_APP_TOKEN or slackcli auth set --app-token)")
 	ErrBadBotPrefix    = errors.New("bot token must start with xoxb-")
 	ErrBadAppPrefix    = errors.New("app token must start with xapp-")
 )

@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/timjonez/slack-cli/internal/config"
+	"github.com/timjonez/slack-cli/internal/mux"
 	"github.com/timjonez/slack-cli/internal/slackx"
 )
 
@@ -35,6 +36,8 @@ func errorCode(err error) string {
 	switch {
 	case errors.Is(err, slackx.ErrNotFound):
 		return "not_found"
+	case errors.Is(err, mux.ErrAlreadyRunning):
+		return "already_running"
 	case errors.Is(err, config.ErrMissingBotToken), errors.Is(err, config.ErrMissingAppToken),
 		errors.Is(err, config.ErrBadBotPrefix), errors.Is(err, config.ErrBadAppPrefix):
 		return "invalid"

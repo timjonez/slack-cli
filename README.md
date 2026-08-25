@@ -35,7 +35,7 @@ Tokens can also live in the environment. Resolution order (first non-empty wins 
 
 Override the file path with `SLACKCLI_CONFIG`. The file is written mode `0600`. Tokens are never printed.
 
-`send`, `get`, `whoami`, `channels`, and `join` need the bot token. `listen` needs both.
+`send`, `get`, `whoami`, `channels`, and `join` need the bot token. `listen` and `serve` need both.
 
 ## Commands
 
@@ -52,6 +52,8 @@ slackcli listen #eng
 slackcli listen #eng --mentions
 slackcli listen #eng --thread 1710000000.000100
 
+slackcli serve                  # shared Socket Mode daemon (listen starts this if needed)
+
 slackcli whoami
 slackcli channels
 slackcli join #eng
@@ -61,15 +63,15 @@ slackcli version
 
 `--json` prints machine-readable JSON on stdout (JSONL for `listen`). Errors go to stderr as `{"error":"...","code":"..."}`. Status from `listen` (`connecting`, `connected`) is always on stderr so the message stream stays pipeable.
 
-`listen` is a blocking Socket Mode client. Background it yourself:
+Slack delivers each Socket Mode event to only one websocket, so multiple `listen` processes cannot each open their own connection. `serve` holds the single connection and fans events out over a unix socket (`$XDG_RUNTIME_DIR/slackcli/slackcli.sock`, or `SLACKCLI_SOCKET`). `listen` subscribes to that socket and starts `serve` in the background if it is not running. Several listeners can filter independently (`#eng`, `--thread`, `--mentions`) and each matching subscriber gets the event.
 
 ```bash
-# another pane / tmux
-slackcli listen #eng
+# optional: run the daemon yourself (systemd --user, tmux, …)
+slackcli serve
 
-# or a user systemd unit
-# ~/.config/systemd/user/slackcli-listen.service
-# ExecStart=/home/you/go/bin/slackcli listen
+# as many listeners as you want
+slackcli listen #eng --thread 1710000000.000100
+slackcli listen #eng --mentions
 ```
 
 ## Channel names
